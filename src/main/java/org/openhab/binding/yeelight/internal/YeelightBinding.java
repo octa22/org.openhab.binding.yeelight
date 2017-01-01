@@ -131,10 +131,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         }
 
         devices = new Hashtable<>();
-        // read further config parameters here ...
         setupSocket();
-        discoverYeelightDevice();
-        //setProperlyConfigured(true);
     }
 
     private void setupSocket() {
@@ -203,7 +200,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         return sentence.startsWith("HTTP/1.1 200 OK");
     }
 
-    private void discoverYeelightDevice() {
+    private void discoverYeelightDevices() {
         String url = null;
 
         try {
@@ -282,6 +279,9 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         // the frequently executed code (polling) goes here ...
         logger.debug("execute() method is called!");
 
+        devices.clear();
+        discoverYeelightDevices();
+
         for (final YeelightBindingProvider provider : providers) {
             for (String itemName : provider.getItemNames()) {
 
@@ -298,52 +298,52 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 if (result == null)
                     continue;
 
-                if(!isProperlyConfigured())
-                    setProperlyConfigured(true);
-
                 logger.info(result);
-                JsonObject jo = parser.parse(result).getAsJsonObject();
-                State newState = null;
-                State oldState = null;
-                try {
-                    switch (action) {
-                        case SET_POWER:
-                            String power = getJSONArrayResult(jo,0).getAsString().toUpperCase();
-                            newState = power.equals("ON") ? OnOffType.ON : OnOffType.OFF;
-                            break;
-                        case SET_BRIGHT:
-                            int bright = getJSONArrayResult(jo,1).getAsInt();
-                            newState = new PercentType(bright == 1 ? 0 : bright);
-                            break;
-                        case SET_CT:
-                            int ct = getJSONArrayResult(jo,2).getAsInt();
-                            newState = new PercentType((ct - 1700) / 48);
-                            break;
-                        case SET_HSB:
-                            int hue = getJSONArrayResult(jo,3).getAsInt();
-                            int sat = getJSONArrayResult(jo,4).getAsInt();
-                            int br = getJSONArrayResult(jo,1).getAsInt();
-                            newState = new HSBType(new DecimalType(hue), new PercentType(sat), new PercentType(br == 1 ? 0 : br));
-                            break;
-                        case SET_RGB:
-                            int rgb = getJSONArrayResult(jo,5).getAsInt();
-                            Color col = getRGBColor(rgb);
-                            newState = new HSBType(col);
-                            break;
-                        default:
-                            logger.info("Unknown Yeelight action: " + action);
-                            continue;
-
-                    }
-
-                    oldState = itemRegistry.getItem(itemName).getState();
-                } catch (ItemNotFoundException e) {
-                    e.printStackTrace();
-                }
-                if (!oldState.equals(newState)) {
-                    eventPublisher.postUpdate(itemName, newState);
-                }
+                processYeelightResult(result, action, itemName);
             }
+        }
+    }
+
+    private void processYeelightResult(String result, String action, String itemName) {
+        JsonObject jo = parser.parse(result).getAsJsonObject();
+        State newState = null;
+        State oldState = null;
+        try {
+            switch (action) {
+                case SET_POWER:
+                    String power = getJSONArrayResult(jo, 0).getAsString().toUpperCase();
+                    newState = power.equals("ON") ? OnOffType.ON : OnOffType.OFF;
+                    break;
+                case SET_BRIGHT:
+                    int bright = getJSONArrayResult(jo, 1).getAsInt();
+                    newState = new PercentType(bright == 1 ? 0 : bright);
+                    break;
+                case SET_CT:
+                    int ct = getJSONArrayResult(jo, 2).getAsInt();
+                    newState = new PercentType((ct - 1700) / 48);
+                    break;
+                case SET_HSB:
+                    int hue = getJSONArrayResult(jo, 3).getAsInt();
+                    int sat = getJSONArrayResult(jo, 4).getAsInt();
+                    int br = getJSONArrayResult(jo, 1).getAsInt();
+                    newState = new HSBType(new DecimalType(hue), new PercentType(sat), new PercentType(br == 1 ? 0 : br));
+                    break;
+                case SET_RGB:
+                    int rgb = getJSONArrayResult(jo, 5).getAsInt();
+                    Color col = getRGBColor(rgb);
+                    newState = new HSBType(col);
+                    break;
+                default:
+                    logger.info("Unknown Yeelight action: " + action);
+
+            }
+
+            oldState = itemRegistry.getItem(itemName).getState();
+        } catch (ItemNotFoundException e) {
+            e.printStackTrace();
+        }
+        if (!oldState.equals(newState)) {
+            eventPublisher.postUpdate(itemName, newState);
         }
     }
 
