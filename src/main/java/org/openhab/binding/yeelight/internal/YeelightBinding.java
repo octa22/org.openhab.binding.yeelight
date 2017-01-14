@@ -127,11 +127,11 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         String refreshIntervalString = (String) configuration.get("refresh");
         if (StringUtils.isNotBlank(refreshIntervalString)) {
             refreshInterval = Long.parseLong(refreshIntervalString);
-            refreshInterval = Long.parseLong(refreshIntervalString);
         }
 
         devices = new Hashtable<>();
         setupSocket();
+        setProperlyConfigured(socket != null);
     }
 
     private void setupSocket() {
@@ -184,7 +184,6 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                         devices.put(id, device);
                         logger.info("Found Yeelight device :\n" + device.toString());
                     }
-                    setProperlyConfigured(devices.size() > 0);
                 }
             }
         } catch (IOException e) {
@@ -334,7 +333,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     newState = new HSBType(col);
                     break;
                 default:
-                    logger.info("Unknown Yeelight action: " + action);
+                    logger.error("Unknown Yeelight action: " + action);
 
             }
 
