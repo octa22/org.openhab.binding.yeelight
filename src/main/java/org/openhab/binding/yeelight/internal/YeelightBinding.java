@@ -334,9 +334,6 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     int hue = getJSONArrayResult(jo, 3).getAsInt();
                     int sat = getJSONArrayResult(jo, 4).getAsInt();
                     int br = getJSONArrayResult(jo, 1).getAsInt();
-                    logger.info("hue: " + hue);
-                    logger.info("sat: " + sat);
-                    logger.info("br: " + br);
                     newState = new HSBType(new DecimalType(hue), new PercentType(sat), new PercentType(br == 1 ? 0 : br));
                     break;
                 case SET_RGB:
