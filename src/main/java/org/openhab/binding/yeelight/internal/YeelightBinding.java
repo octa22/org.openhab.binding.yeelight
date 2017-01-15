@@ -139,7 +139,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             socket = new MulticastSocket(); // must bind receive side
             socket.joinGroup(InetAddress.getByName(MCAST_ADDR));
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e.toString());
         }
 
         thread = new Thread(new Runnable() {
@@ -179,7 +179,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                         else if (line.startsWith("support: "))
                             support = line.substring(9);
                     }
-                    if (!id.equals("") && !devices.contains(id)) {
+                    if (!id.equals("") && !devices.containsKey(id)) {
                         YeelightDevice device = new YeelightDevice(id, location, model, support);
                         devices.put(id, device);
                         logger.info("Found Yeelight device :\n" + device.toString());
@@ -187,7 +187,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e.toString());
         }
     }
 
@@ -278,7 +278,9 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         // the frequently executed code (polling) goes here ...
         logger.debug("execute() method is called!");
 
-        devices.clear();
+        Hashtable<String, String> propList = new Hashtable<>();
+
+        //devices.clear();
         discoverYeelightDevices();
 
         for (final YeelightBindingProvider provider : providers) {
@@ -293,11 +295,18 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     continue;
 
                 String location = config.getLocation();
-                String result = sendYeelightGetPropCommand(location);
-                if (result == null)
-                    continue;
+                String result;
 
-                logger.info(result);
+                if (!propList.containsKey(location)) {
+                    result = sendYeelightGetPropCommand(location);
+                    if (result == null)
+                        continue;
+                    propList.put(location, result);
+                    logger.debug(result);
+                } else {
+                    result = propList.get(location);
+                }
+
                 processYeelightResult(result, action, itemName);
             }
         }
@@ -310,8 +319,8 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         try {
             switch (action) {
                 case SET_POWER:
-                    String power = getJSONArrayResult(jo, 0).getAsString().toUpperCase();
-                    newState = power.equals("ON") ? OnOffType.ON : OnOffType.OFF;
+                    String power = getJSONArrayResult(jo, 0).getAsString();
+                    newState = power.equals("on") ? OnOffType.ON : OnOffType.OFF;
                     break;
                 case SET_BRIGHT:
                     int bright = getJSONArrayResult(jo, 1).getAsInt();
@@ -325,6 +334,9 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     int hue = getJSONArrayResult(jo, 3).getAsInt();
                     int sat = getJSONArrayResult(jo, 4).getAsInt();
                     int br = getJSONArrayResult(jo, 1).getAsInt();
+                    logger.info("hue: " + hue);
+                    logger.info("sat: " + sat);
+                    logger.info("br: " + br);
                     newState = new HSBType(new DecimalType(hue), new PercentType(sat), new PercentType(br == 1 ? 0 : br));
                     break;
                 case SET_RGB:
@@ -339,7 +351,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
 
             oldState = itemRegistry.getItem(itemName).getState();
         } catch (ItemNotFoundException e) {
-            e.printStackTrace();
+            logger.error(e.toString());
         }
         if (!oldState.equals(newState)) {
             eventPublisher.postUpdate(itemName, newState);
@@ -403,7 +415,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 }
                 break;
             default:
-                logger.info("Unknown Yeelight command: " + action);
+                logger.error("Unknown Yeelight command: " + action);
         }
 
     }
@@ -448,13 +460,13 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
             BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             String sentence = "{\"id\":" + msgid++ + ",\"method\":\"" + action + "\",\"params\":[" + getProperties(params) + "]}\r\n";
-            logger.info("Sending sentence: " + sentence);
+            logger.debug("Sending sentence: " + sentence);
             outToServer.writeBytes(sentence);
             return inFromServer.readLine();
             //clientSocket.close();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e.toString());
         } finally {
 
             if (clientSocket != null)
