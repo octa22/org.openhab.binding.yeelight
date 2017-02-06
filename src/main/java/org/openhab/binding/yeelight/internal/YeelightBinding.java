@@ -278,6 +278,10 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         // the frequently executed code (polling) goes here ...
         logger.debug("execute() method is called!");
 
+        if (!bindingsExist()) {
+            return;
+        }
+
         Hashtable<String, String> propList = new Hashtable<>();
 
         //devices.clear();
@@ -302,7 +306,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     if (result == null)
                         continue;
                     propList.put(location, result);
-                    logger.debug(result);
+                    logger.info("Result: " + result);
                 } else {
                     result = propList.get(location);
                 }
@@ -418,7 +422,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
     }
 
     private String sendYeelightGetPropCommand(String location) {
-        return sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat"});
+        return sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat", "rgb"});
     }
 
 
