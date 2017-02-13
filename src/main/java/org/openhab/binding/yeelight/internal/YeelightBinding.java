@@ -306,7 +306,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     if (result == null)
                         continue;
                     propList.put(location, result);
-                    logger.info("Result: " + result);
+                    logger.debug("Result: " + result);
                 } else {
                     result = propList.get(location);
                 }
