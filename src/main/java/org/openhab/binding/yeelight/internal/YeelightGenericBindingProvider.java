@@ -10,6 +10,7 @@ package org.openhab.binding.yeelight.internal;
 
 import org.openhab.binding.yeelight.YeelightBindingProvider;
 import org.openhab.core.items.Item;
+import org.openhab.core.library.items.ColorItem;
 import org.openhab.core.library.items.DimmerItem;
 import org.openhab.core.library.items.SwitchItem;
 import org.openhab.model.item.binding.AbstractGenericBindingProvider;
@@ -36,10 +37,10 @@ public class YeelightGenericBindingProvider extends AbstractGenericBindingProvid
 	 */
 	@Override
 	public void validateItemType(Item item, String bindingConfig) throws BindingConfigParseException {
-		if (!(item instanceof SwitchItem || item instanceof DimmerItem)) {
+		if (!(item instanceof SwitchItem || item instanceof DimmerItem || item instanceof ColorItem)) {
 			throw new BindingConfigParseException("item '" + item.getName()
 					+ "' is of location '" + item.getClass().getSimpleName()
-					+ "', only Switch- and DimmerItems are allowed - please check your *.items configuration");
+					+ "', only Switch-, Dimmer- and ColorItems are allowed - please check your *.items configuration");
 		}
 	}
 
