@@ -55,9 +55,11 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
     //Constants
     private final String RESULT = "result";
     private final String TOGGLE = "toggle";
+    private final String NIGHTLIGHT = "nightlight";
     private final String SMOOTH = "smooth";
     private final String GET_PROP = "get_prop";
     private final String SET_BRIGHT = "set_bright";
+    private final String SET_SCENE = "set_scene";
     private final String SET_POWER = "set_power";
     private final String SET_CT = "set_ct";
     private final String SET_HSB = "set_hsb";
@@ -345,6 +347,10 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     Color col = getRGBColor(rgb);
                     newState = new HSBType(col);
                     break;
+                case NIGHTLIGHT:
+                    String status = getJSONArrayResult(jo, 6).getAsString();
+                    newState = (status.equals("0") || status.equals("")) ? OnOffType.OFF : OnOffType.ON;
+                    break;
                 default:
                     logger.error("Unknown Yeelight action: " + action);
 
@@ -386,6 +392,11 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     sendYeelightPowerCommand(location, command.toString().toLowerCase());
                 }
                 break;
+            case NIGHTLIGHT:
+                if (command instanceof OnOffType) {
+                    sendYeelightNightModeCommand(location, command.equals(OnOffType.ON));
+                }
+                break;
             case TOGGLE:
                 if (command instanceof OnOffType && command.equals(OnOffType.ON)) {
                     sendYeelightToggleCommand(location);
@@ -395,7 +406,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 sendYeelightBrightCommand(location, Integer.parseInt(command.toString()));
                 break;
             case SET_CT:
-                sendYeelightCTCommand(location, Integer.parseInt(command.toString()));
+                sendYeelightCTCommand(location, 1700 + 48 * Integer.parseInt(command.toString()));
                 break;
             case SET_HSB:
                 if (command instanceof HSBType) {
@@ -422,7 +433,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
     }
 
     private String sendYeelightGetPropCommand(String location) {
-        return sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat", "rgb"});
+        return sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat", "rgb", "nl_br"});
     }
 
 
@@ -434,6 +445,13 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         return sendYeelightCommand(location, SET_BRIGHT, new Object[]{param == 0 ? 1 : param, SMOOTH, 500});
     }
 
+    private String sendYeelightNightModeCommand(String location, boolean mode) {
+        if (mode) {
+            return sendYeelightCommand(location, SET_SCENE, new Object[]{"nightlight", 1});
+        } else {
+            return sendYeelightCTCommand(location, 4000);
+        }
+    }
 
     private String sendYeelightRGBCommand(String location, int red, int green, int blue) {
         return sendYeelightCommand(location, SET_RGB, new Object[]{getRGBValue(red, green, blue), SMOOTH, 500});
@@ -444,7 +462,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
     }
 
     private String sendYeelightCTCommand(String location, int param) {
-        return sendYeelightCommand(location, "set_ct_abx", new Object[]{1700 + 48 * param, SMOOTH, 500});
+        return sendYeelightCommand(location, "set_ct_abx", new Object[]{param, SMOOTH, 500});
     }
 
     private String sendYeelightPowerCommand(String location, String param) {
@@ -465,7 +483,8 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             outToServer.writeBytes(sentence);
             return inFromServer.readLine();
             //clientSocket.close();
-
+        } catch (NoRouteToHostException e) {
+            logger.debug("Location " + location + " is probably offline");
         } catch (IOException e) {
             logger.error(e.toString());
         } finally {
