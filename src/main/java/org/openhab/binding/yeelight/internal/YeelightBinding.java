@@ -32,6 +32,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Map;
 
@@ -218,7 +219,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         } catch (MalformedURLException e) {
             logger.error("The URL '" + url + "' is malformed: " + e.toString());
         } catch (Exception e) {
-            logger.error("Cannot get SomfyTahoma login cookie: " + e.toString());
+            logger.error("Cannot send Yeelight datagram packet: " + e.toString());
         }
     }
 
@@ -447,7 +448,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
 
     private String sendYeelightNightModeCommand(String location, boolean mode) {
         if (mode) {
-            return sendYeelightCommand(location, SET_SCENE, new Object[]{"nightlight", 1});
+            return sendYeelightCommand(location, SET_SCENE, new Object[]{NIGHTLIGHT, 1});
         } else {
             return sendYeelightCTCommand(location, 4000);
         }
@@ -485,6 +486,12 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             //clientSocket.close();
         } catch (NoRouteToHostException e) {
             logger.debug("Location " + location + " is probably offline");
+            if (action.equals(GET_PROP)) {
+                //update switches of not found location to OFF state
+                for (Object item : getOnSwitchItems(location)) {
+                    eventPublisher.postUpdate((String) item, OnOffType.OFF);
+                }
+            }
         } catch (IOException e) {
             logger.error(e.toString());
         } finally {
@@ -497,6 +504,28 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 }
         }
         return null;
+    }
+
+    private Object[] getOnSwitchItems(String location) {
+        ArrayList<String> list = new ArrayList<>();
+        for (final YeelightBindingProvider provider : providers) {
+            for (String itemName : provider.getItemNames()) {
+                YeelightBindingConfig config = (YeelightBindingConfig) provider.getItemConfig(itemName);
+                String action = config.getAction();
+                if (config.getLocation().equals(location) && (action.equals(SET_POWER) || action.equals(NIGHTLIGHT))) {
+                    try {
+                        State oldState = itemRegistry.getItem(itemName).getState();
+                        if (oldState.equals(OnOffType.ON)) {
+                            list.add(itemName);
+                        }
+                    } catch (ItemNotFoundException e) {
+                        logger.error(e.toString());
+                    }
+
+                }
+            }
+        }
+        return list.toArray();
     }
 
     private int getRGBValue(int red, int green, int blue) {
