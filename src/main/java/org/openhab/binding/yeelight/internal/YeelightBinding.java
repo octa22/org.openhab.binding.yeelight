@@ -8,11 +8,10 @@
  */
 package org.openhab.binding.yeelight.internal;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.Gson;
 import org.apache.commons.lang.StringUtils;
 import org.openhab.binding.yeelight.YeelightBindingProvider;
+import org.openhab.binding.yeelight.model.YeelightGetPropsResponse;
 import org.openhab.core.binding.AbstractActiveBinding;
 import org.openhab.core.items.ItemNotFoundException;
 import org.openhab.core.items.ItemRegistry;
@@ -72,8 +71,8 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
     //Socket
     private MulticastSocket socket = null;
 
-    //Gson parser
-    private JsonParser parser = new JsonParser();
+    //Gson
+    private Gson gson = new Gson();
 
     //devices
     Hashtable<String, YeelightDevice> devices;
@@ -161,7 +160,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 String sentence = new String(dgram.getData(), 0,
                         dgram.getLength());
 
-                logger.debug("Yeelight received packet: " + sentence);
+                logger.debug("Yeelight received packet: {}", sentence);
 
                 if (isOKPacket(sentence) || isNotifyPacket(sentence)) {
                     String[] lines = sentence.split("\n");
@@ -185,7 +184,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     if (!id.equals("") && !devices.containsKey(id)) {
                         YeelightDevice device = new YeelightDevice(id, location, model, support);
                         devices.put(id, device);
-                        logger.info("Found Yeelight device :\n" + device.toString());
+                        logger.info("Found Yeelight device :\n{}", device.toString());
                     }
                 }
             }
@@ -217,9 +216,9 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
 
             socket.send(sendPacket);
         } catch (MalformedURLException e) {
-            logger.error("The URL '" + url + "' is malformed: " + e.toString());
+            logger.error("The URL '{}' is malformed: ", url, e);
         } catch (Exception e) {
-            logger.error("Cannot send Yeelight datagram packet: " + e.toString());
+            logger.error("Cannot get Yeelight login cookie: ", e);
         }
     }
 
@@ -285,7 +284,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             return;
         }
 
-        Hashtable<String, String> propList = new Hashtable<>();
+        Hashtable<String, YeelightGetPropsResponse> propList = new Hashtable<>();
 
         //devices.clear();
         discoverYeelightDevices();
@@ -302,14 +301,14 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                     continue;
 
                 String location = config.getLocation();
-                String result;
+                YeelightGetPropsResponse result;
 
                 if (!propList.containsKey(location)) {
                     result = sendYeelightGetPropCommand(location);
                     if (result == null)
                         continue;
                     propList.put(location, result);
-                    logger.debug("Result: " + result);
+                    logger.debug("Cached location: {}", location);
                 } else {
                     result = propList.get(location);
                 }
@@ -319,41 +318,42 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         }
     }
 
-    private void processYeelightResult(String result, String action, String itemName) {
-        JsonObject jo = parser.parse(result).getAsJsonObject();
+    private void processYeelightResult(YeelightGetPropsResponse result, String action, String itemName) {
+        //JsonObject jo = parser.parse(result).getAsJsonObject();
         State newState = null;
         State oldState = null;
         try {
             switch (action) {
                 case SET_POWER:
-                    String power = getJSONArrayResult(jo, 0).getAsString();
+                    String power = result.getResult().get(0);
                     newState = power.equals("on") ? OnOffType.ON : OnOffType.OFF;
                     break;
                 case SET_BRIGHT:
-                    int bright = getJSONArrayResult(jo, 1).getAsInt();
+                    int bright = result.getResult().get(1).isEmpty() ? 0 : Integer.parseInt(result.getResult().get(1));
                     newState = new PercentType(bright == 1 ? 0 : bright);
                     break;
                 case SET_CT:
-                    int ct = getJSONArrayResult(jo, 2).getAsInt();
+                    int ct = result.getResult().get(2).isEmpty() ? 0 : Integer.parseInt(result.getResult().get(2));
+                    ;
                     newState = new PercentType((ct - 1700) / 48);
                     break;
                 case SET_HSB:
-                    int hue = getJSONArrayResult(jo, 3).getAsInt();
-                    int sat = getJSONArrayResult(jo, 4).getAsInt();
-                    int br = getJSONArrayResult(jo, 1).getAsInt();
+                    int hue = result.getResult().get(3).isEmpty() ? 0 : Integer.parseInt(result.getResult().get(3));
+                    int sat = result.getResult().get(4).isEmpty() ? 0 : Integer.parseInt(result.getResult().get(4));
+                    int br = result.getResult().get(1).isEmpty() ? 0 : Integer.parseInt(result.getResult().get(1));
                     newState = new HSBType(new DecimalType(hue), new PercentType(sat), new PercentType(br == 1 ? 0 : br));
                     break;
                 case SET_RGB:
-                    int rgb = getJSONArrayResult(jo, 5).getAsInt();
+                    int rgb = result.getResult().get(5).isEmpty() ? 0 : Integer.parseInt(result.getResult().get(5));
                     Color col = getRGBColor(rgb);
                     newState = new HSBType(col);
                     break;
                 case NIGHTLIGHT:
-                    String status = getJSONArrayResult(jo, 6).getAsString();
+                    String status = result.getResult().get(6);
                     newState = (status.equals("0") || status.equals("")) ? OnOffType.OFF : OnOffType.ON;
                     break;
                 default:
-                    logger.error("Unknown Yeelight action: " + action);
+                    logger.error("Unknown Yeelight action: {}", action);
 
             }
 
@@ -361,13 +361,9 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
         } catch (ItemNotFoundException e) {
             logger.error(e.toString());
         }
-        if (!oldState.equals(newState)) {
+        if (oldState == null || !oldState.equals(newState)) {
             eventPublisher.postUpdate(itemName, newState);
         }
-    }
-
-    private JsonElement getJSONArrayResult(JsonObject jo, int pos) {
-        return jo.get(RESULT).getAsJsonArray().get(pos);
     }
 
     /**
@@ -428,15 +424,16 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
                 }
                 break;
             default:
-                logger.error("Unknown Yeelight command: " + action);
+                logger.error("Unknown Yeelight command: {}", action);
         }
 
     }
 
-    private String sendYeelightGetPropCommand(String location) {
-        return sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat", "rgb", "nl_br"});
+    private YeelightGetPropsResponse sendYeelightGetPropCommand(String location) {
+        String result = sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat", "rgb", "nl_br"});
+        logger.info("location: {}, props: {}", location, result);
+        return gson.fromJson(result, YeelightGetPropsResponse.class);
     }
-
 
     private String sendYeelightToggleCommand(String location) {
         return sendYeelightCommand(location, TOGGLE, new Object[]{});
@@ -483,9 +480,8 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             logger.debug("Sending sentence: " + sentence);
             outToServer.writeBytes(sentence);
             return inFromServer.readLine();
-            //clientSocket.close();
         } catch (NoRouteToHostException e) {
-            logger.debug("Location " + location + " is probably offline");
+            logger.debug("Location {} is probably offline", location);
             if (action.equals(GET_PROP)) {
                 //update switches of not found location to OFF state
                 for (Object item : getOnSwitchItems(location)) {
