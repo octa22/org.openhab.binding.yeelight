@@ -319,7 +319,6 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
     }
 
     private void processYeelightResult(YeelightGetPropsResponse result, String action, String itemName) {
-        //JsonObject jo = parser.parse(result).getAsJsonObject();
         State newState = null;
         State oldState = null;
         try {
@@ -431,7 +430,7 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
 
     private YeelightGetPropsResponse sendYeelightGetPropCommand(String location) {
         String result = sendYeelightCommand(location, GET_PROP, new Object[]{"power", "bright", "ct", "hue", "sat", "rgb", "nl_br"});
-        logger.info("location: {}, props: {}", location, result);
+        logger.debug("location: {}, props: {}", location, result);
         return gson.fromJson(result, YeelightGetPropsResponse.class);
     }
 
@@ -477,13 +476,13 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
             DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
             BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             String sentence = "{\"id\":" + msgid++ + ",\"method\":\"" + action + "\",\"params\":[" + getProperties(params) + "]}\r\n";
-            logger.debug("Sending sentence: " + sentence);
+            logger.debug("Sending sentence: {}", sentence);
             outToServer.writeBytes(sentence);
             return inFromServer.readLine();
         } catch (NoRouteToHostException e) {
             logger.debug("Location {} is probably offline", location);
             if (action.equals(GET_PROP)) {
-                //update switches of not found location to OFF state
+                //update switches if not found location to OFF state
                 for (Object item : getOnSwitchItems(location)) {
                     eventPublisher.postUpdate((String) item, OnOffType.OFF);
                 }
