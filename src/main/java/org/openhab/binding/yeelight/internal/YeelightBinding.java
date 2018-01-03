@@ -444,9 +444,10 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
 
     private String sendYeelightNightModeCommand(String location, boolean mode) {
         if (mode) {
-            return sendYeelightCommand(location, SET_SCENE, new Object[]{NIGHTLIGHT, 1});
+            //return sendYeelightCommand(location, SET_SCENE, new Object[]{NIGHTLIGHT, 1});
+            return sendYeelightPowerCommand(location, "on", 5);
         } else {
-            return sendYeelightCTCommand(location, 4000);
+            return sendYeelightPowerCommand(location, "on", 1);
         }
     }
 
@@ -464,6 +465,10 @@ public class YeelightBinding extends AbstractActiveBinding<YeelightBindingProvid
 
     private String sendYeelightPowerCommand(String location, String param) {
         return sendYeelightCommand(location, SET_POWER, new Object[]{param, "", 0});
+    }
+
+    private String sendYeelightPowerCommand(String location, String param, int mode) {
+        return sendYeelightCommand(location, SET_POWER, new Object[]{param, "", 0, mode});
     }
 
     private String sendYeelightCommand(String location, String action, Object[] params) {
